@@ -6,9 +6,9 @@ import (
 	"github.com/tradmark/common"
 )
 
-type Classifications struct {
-	Classification Classification `json:"classification"`
-}
+// type Classifications struct {
+// 	Classification []Classification `json:"classification" gorm:"foreignKey:ID"`
+// }
 
 func (n Classifications) Value() (driver.Value, error) {
 	return common.MarshalJSONHelper(n)
@@ -19,13 +19,13 @@ func (n *Classifications) Scan(value interface{}) error {
 }
 
 type Classification struct {
-	InternationalCodeTotalNo int   `json:"international_code_total_no"`
-	UsCodeTotalNo            int   `json:"us_code_total_no"`
-	InternationalCode        int   `json:"international_code"`
-	UsCode                   []int `json:"us_code"`
-	StatusCode               int   `json:"status_code"`
-	StatusDate               int64 `json:"status_date"`
-	PrimaryCode              int   `json:"primary_code"`
+	InternationalCodeTotalNo string   `json:"international-code-total-no"`
+	UsCodeTotalNo            string   `json:"us-code-total-no"`
+	InternationalCode        string   `json:"international-code"`
+	StatusCode               string   `json:"status-code"`
+	StatusDate               string   `json:"status-date"`
+	PrimaryCode              string   `json:"primary-code"`
+	UsCode                   []string `json:"us-code"`
 }
 
 func (n Classification) Value() (driver.Value, error) {

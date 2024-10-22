@@ -6,9 +6,9 @@ import (
 	"github.com/tradmark/common"
 )
 
-type CaseFileOwners struct {
-	CaseFileOwner CaseFileOwner `json:"case_file_owner"`
-}
+// type CaseFileOwners struct {
+// 	CaseFileOwner CaseFileOwner `json:"case-file-owner" gorm:"foreignKey:ID"`
+// }
 
 func (n CaseFileOwners) Value() (driver.Value, error) {
 	return common.MarshalJSONHelper(n)
@@ -19,15 +19,15 @@ func (n *CaseFileOwners) Scan(value interface{}) error {
 }
 
 type CaseFileOwner struct {
-	EntryNumber         int         `json:"entry_number"`
-	PartyType           int         `json:"party_type"`
+	EntryNumber         string      `json:"entry-number"`
+	PartyType           string      `json:"party-type"`
 	Nationality         Nationality `json:"nationality"`
-	LegalEntityTypeCode int         `json:"legal_entity_type_code"`
-	PartyName           string      `json:"party_name"`
-	Address1            string      `json:"address_1"`
+	LegalEntityTypeCode string      `json:"legal-entity-type-code"`
+	PartyName           string      `json:"party-name"`
+	Address1            string      `json:"address-1"`
 	City                string      `json:"city"`
 	Country             string      `json:"country"`
-	Postcode            int         `json:"postcode"`
+	Postcode            string      `json:"postcode"`
 }
 
 func (n CaseFileOwner) Value() (driver.Value, error) {

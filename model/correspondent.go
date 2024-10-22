@@ -7,11 +7,11 @@ import (
 )
 
 type Correspondent struct {
-	Address1 string `json:"address_1"`
-	Address2 string `json:"address_2"`
-	Address3 string `json:"address_3"`
-	Address4 string `json:"address_4"`
-	Address5 string `json:"address_5"`
+	Address1 string `json:"address-1"`
+	Address2 string `json:"address-2"`
+	Address3 string `json:"address-3"`
+	Address4 string `json:"address-4"`
+	Address5 string `json:"address-5"`
 }
 
 func (n Correspondent) Value() (driver.Value, error) {
