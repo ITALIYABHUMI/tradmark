@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/spf13/viper"
-	"github.com/tradmark/model"
+	"github.com/tradmark/public/model"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )

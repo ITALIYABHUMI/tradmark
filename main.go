@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/tradmark/cmd"
 	"github.com/tradmark/config"
+	"github.com/tradmark/public/api"
 )
 
 func main() {
@@ -23,6 +24,7 @@ func main() {
 
 	log.Println("Starting server...")
 
+	api.Routes(app)
 	config.Init()
 	cmd.Execute()
 

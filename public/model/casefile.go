@@ -2,8 +2,6 @@ package model
 
 import (
 	"database/sql/driver"
-	"encoding/json"
-	"fmt"
 
 	"github.com/tradmark/common"
 	"gorm.io/datatypes"
@@ -97,68 +95,6 @@ type CaseFile struct {
 	Correspondent           datatypes.JSON `json:"correspondent"`
 	CaseFileOwners          datatypes.JSON `json:"case-file-owners"`
 	Visible                 bool           `json:"visible" gorm:"default:true"`
-}
-
-type Classifications []Classification
-type CaseFileOwners []CaseFileOwner
-type CaseFileEventStatements []CaseFileEventStatement
-
-// Custom unmarshaler for CaseFileOwners
-func (c *Classifications) UnmarshalJSON(data []byte) error {
-	// Try unmarshaling into a slice first
-	var classifications []Classification
-	if err := json.Unmarshal(data, &classifications); err == nil {
-		*c = classifications
-		return nil
-	}
-
-	// If it's not a slice, try unmarshaling into a single object
-	var singleClassification Classification
-	if err := json.Unmarshal(data, &singleClassification); err == nil {
-		*c = []Classification{singleClassification}
-		return nil
-	}
-
-	// Return error if neither worked
-	return fmt.Errorf("failed to unmarshal Classifications: %s", data)
-}
-
-func (c *CaseFileOwners) UnmarshalJSON(data []byte) error {
-	// Try unmarshaling into a slice first
-	var caseFileOwners []CaseFileOwner
-	if err := json.Unmarshal(data, &caseFileOwners); err == nil {
-		*c = caseFileOwners
-		return nil
-	}
-
-	// If it's not a slice, try unmarshaling into a single object
-	var singleCaseFileOwner CaseFileOwner
-	if err := json.Unmarshal(data, &singleCaseFileOwner); err == nil {
-		*c = []CaseFileOwner{singleCaseFileOwner}
-		return nil
-	}
-
-	// Return error if neither worked
-	return fmt.Errorf("failed to unmarshal CaseFileOwners: %s", data)
-}
-
-func (c *CaseFileEventStatements) UnmarshalJSON(data []byte) error {
-	// Try unmarshaling into a slice first
-	var CaseFileEventStatements []CaseFileEventStatement
-	if err := json.Unmarshal(data, &CaseFileEventStatements); err == nil {
-		*c = CaseFileEventStatements
-		return nil
-	}
-
-	// If it's not a slice, try unmarshaling into a single object
-	var singleCaseFileEventStatements CaseFileEventStatement
-	if err := json.Unmarshal(data, &singleCaseFileEventStatements); err == nil {
-		*c = []CaseFileEventStatement{singleCaseFileEventStatements}
-		return nil
-	}
-
-	// Return error if neither worked
-	return fmt.Errorf("failed to unmarshal Classifications: %s", data)
 }
 
 func (n CaseFile) Value() (driver.Value, error) {

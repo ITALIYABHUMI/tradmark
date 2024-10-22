@@ -14,7 +14,8 @@ import (
 
 	xj "github.com/basgys/goxml2json"
 	"github.com/tradmark/config"
-	"github.com/tradmark/model"
+	"github.com/tradmark/pkg"
+	"github.com/tradmark/public/model"
 )
 
 func Unzip(file string) (result string) {
@@ -127,17 +128,49 @@ func ConverToJsonData(file string) (model.TrademarkApplicationsDailyWrapper, err
 }
 
 func SaveDataToDb(trademarkApplicationsDailyWrapper model.TrademarkApplicationsDailyWrapper) error {
+
+	// var resp *esapi.Response
+	// var req esapi.IndexRequest
+
 	db := config.GetDB()
 	if db == nil {
 		return fmt.Errorf("Database is not initialized")
 	}
 	log.Println("Database is initialized")
 	for _, caseFile := range trademarkApplicationsDailyWrapper.TrademarkApplicationsDaily.ApplicationInformation.FileSegments.ActionKeys[0].CaseFile {
-		if err := db.Table("case_files").Create(&caseFile).Error; err != nil {
-			log.Printf("failed to insert CaseFile: %v", err)
-			return err
+		err := pkg.TradesRepository.CreateCaseFiles(config.GetDB(), &caseFile)
+		if err != nil {
+			return fmt.Errorf("CaseFiles not added into database")
 		}
+
+		// data, err := transformDataForElasticsearch(caseFile)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// req = esapi.IndexRequest{
+		// 	Index:      "tradmark",
+		// 	DocumentID: caseFile.SerialNumber,
+		// 	Body:       bytes.NewReader(data),
+		// 	Refresh:    "true",
+		// }
 	}
+
+	// resp, err := req.Do(context.Background(), config.EsClient)
+	// if err != nil {
+	// 	return fmt.Errorf("Error getting response: %v", err)
+	// }
+	// defer resp.Body.Close()
+
 	log.Println("All CaseFiles inserted successfully")
 	return nil
+}
+
+func transformDataForElasticsearch(caseFile model.CaseFile) ([]byte, error) {
+
+	data, err := json.Marshal(caseFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal CaseFile: %v", err)
+	}
+	return data, nil
 }

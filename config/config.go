@@ -4,8 +4,8 @@ import (
 	"log"
 
 	"github.com/spf13/viper"
-	
-	"github.com/tradmark/model"
+
+	"github.com/tradmark/public/model"
 )
 
 var settings model.Settings
@@ -17,6 +17,8 @@ func Init() {
 	}
 
 	Connectdb()
+	EsClientConnection()
+	EsCreateIndexIfNotExists()
 }
 
 func GetConfig() *model.Settings {
