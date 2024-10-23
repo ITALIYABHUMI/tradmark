@@ -22,10 +22,11 @@ func main() {
 	flag.StringVar(&port, "port", ":8080", "port number")
 	flag.Parse()
 
+	config.Init()
+
 	log.Println("Starting server...")
 
 	api.Routes(app)
-	config.Init()
 	cmd.Execute()
 
 	log.Fatal(app.Listen(port))

@@ -21,6 +21,5 @@ func UnmarshalJSONHelper(value interface{}, dest interface{}) error {
 		return errors.New("failed to scan")
 	}
 
-
 	return json.Unmarshal(bytes, dest)
 }

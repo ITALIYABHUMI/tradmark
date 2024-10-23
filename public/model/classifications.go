@@ -32,6 +32,5 @@ func (c *Classifications) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Return error if neither worked
 	return fmt.Errorf("failed to unmarshal Classifications: %s", data)
 }
