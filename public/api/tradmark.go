@@ -13,7 +13,7 @@ func SetTradesroutes(app *fiber.App) {
 	trads.Get("/indics", CreateIndics)
 	trads.Get("/serialnumber/:serialnumber", FetchTradsBySerialNumber)
 	trads.Get("/:data", SearchTradMarks)
-
+	trads.Post("/visibility/:serialnumber/:bool", UpdateTrademarkVisibility)
 }
 
 func FetchTradsBySerialNumber(c *fiber.Ctx) error {
@@ -41,4 +41,19 @@ func SearchTradMarks(c *fiber.Ctx) error {
 		return err
 	}
 	return c.JSON(resp)
+}
+
+func UpdateTrademarkVisibility(c *fiber.Ctx) error {
+	serialnumber := c.Params("serialnumber")
+	visible := c.Params("bool")
+
+	caseFile, err := pkg.TradesRepository.UpdateTrademarkVisibility(config.GetDB(), serialnumber, visible)
+	if err != nil {
+		return err
+	}
+
+	if err := pkg.SearchRepository.UpdateTrademarkVisibility(config.GetDB(), caseFile); err != nil {
+		return err
+	}
+	return c.JSON("Visibility Changed")
 }

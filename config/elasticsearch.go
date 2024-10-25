@@ -11,32 +11,34 @@ import (
 )
 
 var EsClient *elasticsearch.Client
-var SearchIndex = "tradmark"
+
 
 func EsCreateIndexIfNotExists() {
-
+	IndexName := viper.GetString("ES_INDEXNAME")
+	
 	if EsClient == nil {
 		log.Fatal("Elasticsearch client is not initialized")
 		return
 	}
 
 	_, err := esapi.IndicesExistsRequest{
-		Index: []string{SearchIndex},
+		Index: []string{IndexName},
 	}.Do(context.Background(), EsClient)
 
 	if err != nil {
-		_, err := EsClient.Indices.Create(SearchIndex)
+		_, err := EsClient.Indices.Create(IndexName)
 		if err != nil {
 			log.Fatalf("Error creating index: %s", err)
 		} else {
-			fmt.Printf("Created index %s\n", SearchIndex)
+			fmt.Printf("Created index %s\n", IndexName)
 		}
-	} else {
-		fmt.Printf("Index %s already exists\n", SearchIndex)
+		} else {
+		fmt.Printf("Index %s already exists\n", IndexName)
 	}
 }
 
 func EsClientConnection() {
+
 	Username := viper.GetString("ES_USERNAME")
 	password := viper.GetString("ES_PASSWORD")
 

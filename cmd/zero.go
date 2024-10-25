@@ -117,7 +117,7 @@ func ConverToJsonData(file string) (model.TrademarkApplicationsDailyWrapper, err
 		return model.TrademarkApplicationsDailyWrapper{}, fmt.Errorf("failed to convert XML to JSON")
 	}
 
-	// Unmarshal JSON into the root structure
+	// Unmarshal JSON into model.TrademarkApplicationsDailyWrapper
 	var trademarkApplicationsDailyWrapper model.TrademarkApplicationsDailyWrapper
 	err = json.Unmarshal(jsonData.Bytes(), &trademarkApplicationsDailyWrapper)
 	if err != nil {

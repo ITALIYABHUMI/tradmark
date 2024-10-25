@@ -10,6 +10,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/spf13/viper"
 	"github.com/tradmark/config"
 	"github.com/tradmark/public/model"
 	"gorm.io/gorm"
@@ -18,10 +19,13 @@ import (
 type Repository interface {
 	Create(db *gorm.DB) (any, error)
 	FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any, error)
-	Search(db *gorm.DB, data string) (any, error)
+	Search(db *gorm.DB, data string) ([]map[string]interface{}, error)
+	UpdateTrademarkVisibility(db *gorm.DB, caseFile *model.CaseFile) error
 }
 
 type repo struct{}
+
+var IndexName string = viper.GetString("ES_INDEXNAME")
 
 func PostgresRepo() Repository {
 	return &repo{}
@@ -46,9 +50,9 @@ func (r *repo) Create(db *gorm.DB) (any, error) {
 			if err != nil {
 				return nil, err
 			}
-			// Prepare Elasticsearch IndexRequest
+
 			req := esapi.IndexRequest{
-				Index:      "tradmark",
+				Index:      IndexName,
 				DocumentID: caseFile.SerialNumber,
 				Body:       bytes.NewBuffer(data),
 			}
@@ -60,9 +64,6 @@ func (r *repo) Create(db *gorm.DB) (any, error) {
 			}
 
 			if resp.IsError() || resp.StatusCode > 299 {
-				fmt.Println("resp.String()", resp.String())
-				fmt.Println(resp.IsError())
-
 				return resp.String(), fmt.Errorf("Elasticsearch error: %v", resp.String())
 			}
 		}
@@ -97,15 +98,24 @@ func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any,
 	defer cancel()
 
 	search := esapi.SearchRequest{
-		Index: []string{"tradmark"},
+		Index: []string{IndexName},
 		Body: strings.NewReader(fmt.Sprintf(`{
-			 "query": {
-				  "match": {
-				  		"serial-number" : "%s"
-				  }
-			 },
-			 "from": 0,
-			 "size": 10
+			"query": {
+				"bool" : {
+					"must": [
+						{
+							"match": {
+								"serial-number" : "%s"
+							}
+						},
+						{
+							"match":{
+								"visible": "true"
+							}
+						}
+					]
+				}
+			}
 		}`, searialNumber)),
 	}
 
@@ -115,9 +125,6 @@ func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any,
 	}
 
 	if response.IsError() || response.StatusCode > 299 {
-		fmt.Println("response.String()", response.String())
-		fmt.Println(response.IsError())
-
 		return response.String(), fmt.Errorf("Elasticsearch error: %v", response.String())
 	}
 
@@ -125,110 +132,123 @@ func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any,
 		return nil, fmt.Errorf("Error decoding response: %v", err)
 	}
 
-	for _, hit := range resp["hits"].(map[string]interface{})["hits"].([]interface{}) {
-		doc := hit.(map[string]interface{})
-		source := doc["_source"]
-		return source, nil
+	if resp["hits"].(map[string]interface{})["hits"] == "" {
+		return nil, nil
+	} else {
+		for _, hit := range resp["hits"].(map[string]interface{})["hits"].([]interface{}) {
+			doc := hit.(map[string]interface{})
+			source := doc["_source"]
+			return source, nil
+		}
 	}
 
-	return resp, nil
+	return nil, nil
+
 }
 
-func (r *repo) Search(db *gorm.DB, data string) (any, error) {
+func (r *repo) Search(db *gorm.DB, data string) ([]map[string]interface{}, error) {
 	var resp map[string]interface{}
-
 	var ctx context.Context
 
-	q := &types.Query{
-		Bool: &types.BoolQuery{
-			Must: make([]types.Query, 0),
-		},
-	}
-
-	q.Bool.Must = append(q.Bool.Must, types.Query{
-		Match: map[string]types.MatchQuery{
-			"serialNumber":     {Query: data},
-			"description-text": {Query: data},
-			"attorney-name":    {Query: data},
-			"employee-name":    {Query: data},
-			"text":             {Query: data},
-			"address-1":        {Query: data},
-			"address-2":        {Query: data},
-			"address-3":        {Query: data},
-			"address-4":        {Query: data},
-			"address-5":        {Query: data},
-			"city":             {Query: data},
-			"party-name":       {Query: data},
-			"country":          {Query: data},
-			"entity-statement": {Query: data},
-			"serial-number":    {Query: data},
-		},
-	})
-
+	// Context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// search := esapi.SearchRequest{
-	// 	Index: []string{"tradmark"},
-	// 	Body: strings.NewReader(fmt.Sprintf(`{
-	// 		 "query": {
-	// 			  "match": {
-	// 			  		"description-text" : "%s",
-	// 					"attorney-name" : "%s",
-	// 					"employee-name" : "%s",
-	// 					"text" : "%s",
-	// 					"description-text" : "%s",
-	// 					"address-1": "%s",
-	// 					"address-2": "%s",
-	// 					"address-3":  "%s",
-	// 					"address-4":  "%s",
-	// 					"address-5":  "%s",
-	// 					"city" ; "%s",
-	// 					"party-name" : "%s",
-	// 					"country" : "%s",
-	// 					"entity-statement": "%s",
-	// 			  }
-	// 		 },
-	// 		 "from": 0,
-	// 		 "size": 10
-	// 	}`, data)),
-	// }
-
+	// Elasticsearch search request
 	search := esapi.SearchRequest{
-		Index: []string{"tradmark"},
+		Index: []string{IndexName},
 		Body: strings.NewReader(fmt.Sprintf(`{
-				"query": {
-					"multi_match": {
-						"query": "%s", 
-						"fields": ["description-text", "attorney-name", "city"]
-					}
+			"query": {
+				"bool": {
+					"must": [
+						{
+							"match": {
+								"visible" : { 
+									"query": "true"
+								}
+							}
+						},
+						{
+							"multi_match": {
+								"query": "%s", 
+								"fields": [
+									"case-file-header.attorney-name", 
+									"case-file-header.employee-name", 
+									"case-file-owners.case-file-owner.city", 
+									"case-file-owners.case-file-owner.state", 
+									"case-file-owners.case-file-owner.country", 
+									"case-file-owners.case-file-owners.party-name", 
+									"case-file-owners.case-file-owner.nationality.country", 
+									"case-file-owners.case-file-owner.nationality.state",
+									"serial-number"
+								]
+							}
+						}
+					]
 				}
-			}`, data)),
+			}
+		}`, data)),
 	}
 
+	// Execute the search request
 	response, err := search.Do(ctx, config.EsClient)
 	if err != nil {
 		return nil, fmt.Errorf("Error getting response: %v", err)
 	}
+	defer response.Body.Close()
 
 	if response.IsError() || response.StatusCode > 299 {
-		fmt.Println("response.String()", response.String())
-		fmt.Println(response.IsError())
-
-		return response, fmt.Errorf("Elasticsearch error: %v", response.String())
+		return nil, fmt.Errorf("Elasticsearch error: %v", response.String())
 	}
 
+	// Decode the response
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
 		return nil, fmt.Errorf("Error decoding response: %v", err)
 	}
 
-	for _, hit := range resp["hits"].(map[string]interface{})["hits"].([]interface{}) {
-		doc := hit.(map[string]interface{})
-		source := doc["_source"]
-		return source, nil
+	hits := resp["hits"].(map[string]interface{})["hits"].([]interface{})
+	if len(hits) == 0 {
+		return nil, nil
 	}
 
-	return resp, nil
+	var results []map[string]interface{}
+	for _, hit := range hits {
+		doc := hit.(map[string]interface{})
+		source := doc["_source"].(map[string]interface{})
+		results = append(results, source)
+	}
+
+	return results, nil
+}
+
+func (r *repo) UpdateTrademarkVisibility(db *gorm.DB, caseFile *model.CaseFile) error {
+
+	updateBody := map[string]interface{}{
+		"doc": caseFile,
+	}
+
+	data, err := json.Marshal(updateBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal CaseFile: %v", err)
+	}
+
+	req := esapi.UpdateRequest{
+		Index:      IndexName,
+		DocumentID: caseFile.SerialNumber,
+		Body:       bytes.NewReader(data),
+	}
+
+	resp, err := req.Do(context.Background(), config.EsClient)
+	if err != nil {
+		return fmt.Errorf("error getting response: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.IsError() || resp.StatusCode > 299 {
+		return fmt.Errorf("elasticsearch error: %v", resp.String())
+	}
+
+	return nil
 }
 
 func transformDataForElasticsearch(caseFile *model.CaseFile) ([]byte, error) {
