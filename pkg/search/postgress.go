@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -59,68 +60,65 @@ func (r *repo) Create(db *gorm.DB) (any, error) {
 	return nil, nil
 }
 
-func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (types.ResponseBody, error) {
+func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, serialNumber string) (any, error) {
 	var resp types.ResponseBody
-	var ctx context.Context
-
-	q := &types.Query{
-		Bool: &types.BoolQuery{
-			Must: make([]types.Query, 0),
-		},
-	}
-
-	q.Bool.Must = append(q.Bool.Must, types.Query{
-		Match: map[string]types.MatchQuery{
-			"serialNumber": {
-				Query: searialNumber,
-			},
-		},
-	})
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	search := esapi.SearchRequest{
-		Index: []string{IndexName},
-		Body: strings.NewReader(fmt.Sprintf(`{
-			"query": {
-				"bool" : {
-					"must": [
-						{
-							"match": {
-								"serial-number" : "%s"
-							}
+	q := &types.Query{
+		Bool: &types.BoolQuery{
+			Must: []types.Query{
+				{
+					Match: map[string]types.MatchQuery{
+						"serial-number": {
+							Query: serialNumber,
 						},
-						{
-							"match":{
-								"visible": "true"
-							}
-						}
-					]
-				}
-			}
-		}`, searialNumber)),
+					},
+				},
+				{
+					Match: map[string]types.MatchQuery{
+						"visible": {
+							Query: "true",
+						},
+					},
+				},
+			},
+		},
 	}
 
-	// res, err := config.EsClient.Get(IndexName, searialNumber)
+	body, err := json.Marshal(map[string]interface{}{"query": q})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling query to JSON: %v", err)
+	}
+
+	search := esapi.SearchRequest{
+		Index: []string{IndexName},
+		Body:  strings.NewReader(string(body)),
+	}
 
 	response, err := search.Do(ctx, config.EsClient)
 	if err != nil {
-		return types.ResponseBody{}, fmt.Errorf("Error getting response: %v", err)
+		return nil, fmt.Errorf("error getting response: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.IsError() {
+		errorBody, _ := io.ReadAll(response.Body)
+		return nil, fmt.Errorf("Elasticsearch error: %s", string(errorBody))
 	}
 
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		return types.ResponseBody{}, fmt.Errorf("Error decoding response: %v", err)
+		return nil, fmt.Errorf("error decoding response: %v", err)
 	}
 
-	if resp.Hits.Hits == nil {
-		return types.ResponseBody{}, nil
-	} else {
-		return resp, nil
+	if len(resp.Hits.Hits) == 0 {
+		return nil, nil
 	}
+
+	return resp.Hits.Hits[0].Source_, nil
 }
 
-func (r *repo) Search(db *gorm.DB, data string) (types.ResponseBody, error) {
+func (r *repo) Search(db *gorm.DB, data string) (any, error) {
 	var resp types.ResponseBody
 	var ctx context.Context
 
@@ -129,58 +127,70 @@ func (r *repo) Search(db *gorm.DB, data string) (types.ResponseBody, error) {
 	defer cancel()
 
 	// Elasticsearch search request
+	query := types.Query{
+		Bool: &types.BoolQuery{
+			Must: []types.Query{
+				{
+					Match: map[string]types.MatchQuery{
+						"visible": {
+							Query: "true",
+						},
+					},
+				},
+				{
+					MultiMatch: &types.MultiMatchQuery{
+						Query: data,
+						Fields: []string{
+							"serial-number",
+							"case-file-header.attorney-name",
+							"case-file-header.employee-name",
+							"case-file-owners.case-file-owner.city",
+							"case-file-owners.case-file-owner.state",
+							"case-file-owners.case-file-owner.country",
+							"case-file-owners.case-file-owner.party-name",
+							"case-file-owners.case-file-owner.nationality.country",
+							"case-file-owners.case-file-owner.nationality.state",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(map[string]interface{}{"query": query})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling query to JSON: %v", err)
+	}
+
 	search := esapi.SearchRequest{
 		Index: []string{IndexName},
-		Body: strings.NewReader(fmt.Sprintf(`{
-			"query": {
-				"bool": {
-					"must": [
-						{
-							"match": {
-								"visible" : { 
-									"query": "true"
-								}
-							}
-						},
-						{
-							"multi_match": {
-								"query": "%s", 
-								"fields": [
-									"case-file-header.attorney-name", 
-									"case-file-header.employee-name", 
-									"case-file-owners.case-file-owner.city", 
-									"case-file-owners.case-file-owner.state", 
-									"case-file-owners.case-file-owner.country", 
-									"case-file-owners.case-file-owners.party-name", 
-									"case-file-owners.case-file-owner.nationality.country", 
-									"case-file-owners.case-file-owner.nationality.state",
-									"serial-number"
-								]
-							}
-						}
-					]
-				}
-			}
-		}`, data)),
+		Body:  strings.NewReader(string(body)),
 	}
 
 	// Execute the search request
 	response, err := search.Do(ctx, config.EsClient)
 	if err != nil {
-		return types.ResponseBody{}, fmt.Errorf("Error getting response: %v", err)
+		return nil, fmt.Errorf("Error getting response: %v", err)
 	}
 	defer response.Body.Close()
 
 	// Decode the response
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		return types.ResponseBody{}, fmt.Errorf("Error decoding response: %v", err)
+		return nil, fmt.Errorf("Error decoding response: %v", err)
 	}
 
-	hits := resp.Hits.Hits
-	if len(hits) == 0 {
-		return types.ResponseBody{}, nil
+	if len(resp.Hits.Hits) == 0 {
+		return nil, nil
 	}
-	return resp, nil
+
+	var sources []json.RawMessage
+
+	for _, hit := range resp.Hits.Hits {
+		sources = append(sources, hit.Source_)
+	}
+
+	return sources, nil
+
 }
 
 func (r *repo) UpdateTrademarkVisibility(db *gorm.DB, caseFile *model.CaseFile) error {

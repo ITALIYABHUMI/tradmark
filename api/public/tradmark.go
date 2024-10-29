@@ -22,7 +22,7 @@ func FetchTradsBySerialNumber(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(caseFile.Hits.Hits)
+	return c.JSON(caseFile)
 }
 
 func CreateIndics(c *fiber.Ctx) error {
@@ -40,7 +40,7 @@ func SearchTradMarks(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(resp.Hits.Hits)
+	return c.JSON(resp)
 }
 
 func UpdateTrademarkVisibility(c *fiber.Ctx) error {
