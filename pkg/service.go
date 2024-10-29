@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	TradesRepository tradmark.Repository
-	SearchRepository search.Repository
+	TradesRepository tradmark.Repository = nil
+	SearchRepository search.Repository   = nil
 )
 
 func init() {

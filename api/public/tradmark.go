@@ -1,4 +1,4 @@
-package api
+package public
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ func SetTradesroutes(app *fiber.App) {
 	trads.Get("/indics", CreateIndics)
 	trads.Get("/serialnumber/:serialnumber", FetchTradsBySerialNumber)
 	trads.Get("/:data", SearchTradMarks)
-	trads.Post("/visibility/:serialnumber/:bool", UpdateTrademarkVisibility)
+	trads.Get("/visibility/:serialnumber/:bool", UpdateTrademarkVisibility)
 }
 
 func FetchTradsBySerialNumber(c *fiber.Ctx) error {
@@ -22,7 +22,7 @@ func FetchTradsBySerialNumber(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(caseFile)
+	return c.JSON(caseFile.Hits.Hits)
 }
 
 func CreateIndics(c *fiber.Ctx) error {
@@ -40,7 +40,7 @@ func SearchTradMarks(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(resp)
+	return c.JSON(resp.Hits.Hits)
 }
 
 func UpdateTrademarkVisibility(c *fiber.Ctx) error {

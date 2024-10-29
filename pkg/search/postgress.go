@@ -11,25 +11,14 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/spf13/viper"
+	"github.com/tradmark/api/model"
 	"github.com/tradmark/config"
-	"github.com/tradmark/public/model"
 	"gorm.io/gorm"
 )
-
-type Repository interface {
-	Create(db *gorm.DB) (any, error)
-	FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any, error)
-	Search(db *gorm.DB, data string) ([]map[string]interface{}, error)
-	UpdateTrademarkVisibility(db *gorm.DB, caseFile *model.CaseFile) error
-}
 
 type repo struct{}
 
 var IndexName string = viper.GetString("ES_INDEXNAME")
-
-func PostgresRepo() Repository {
-	return &repo{}
-}
 
 func (r *repo) Create(db *gorm.DB) (any, error) {
 
@@ -38,7 +27,7 @@ func (r *repo) Create(db *gorm.DB) (any, error) {
 
 	for {
 		var caseFiles []model.CaseFile
-		if err := db.Order("serial_number").Limit(batchSize).Offset(offset).Find(&caseFiles).Error; err != nil {
+		if err := db.Limit(batchSize).Offset(offset).Find(&caseFiles).Error; err != nil {
 			return nil, fmt.Errorf("error fetching data: %v", err)
 		}
 		if len(caseFiles) == 0 {
@@ -58,26 +47,20 @@ func (r *repo) Create(db *gorm.DB) (any, error) {
 			}
 
 			// Send the request
-			resp, err := req.Do(context.Background(), config.EsClient)
+			_, err = req.Do(context.Background(), config.EsClient)
 			if err != nil {
 				return nil, fmt.Errorf("Error getting response: %v", err)
 			}
 
-			if resp.IsError() || resp.StatusCode > 299 {
-				return resp.String(), fmt.Errorf("Elasticsearch error: %v", resp.String())
-			}
 		}
 		offset += batchSize
 	}
 
-	// defer resp.Body.Close()
-
 	return nil, nil
 }
 
-func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any, error) {
-	var resp map[string]interface{}
-
+func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (types.ResponseBody, error) {
+	var resp types.ResponseBody
 	var ctx context.Context
 
 	q := &types.Query{
@@ -119,35 +102,26 @@ func (r *repo) FetchTradsBySerialNumber(db *gorm.DB, searialNumber string) (any,
 		}`, searialNumber)),
 	}
 
+	// res, err := config.EsClient.Get(IndexName, searialNumber)
+
 	response, err := search.Do(ctx, config.EsClient)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting response: %v", err)
-	}
-
-	if response.IsError() || response.StatusCode > 299 {
-		return response.String(), fmt.Errorf("Elasticsearch error: %v", response.String())
+		return types.ResponseBody{}, fmt.Errorf("Error getting response: %v", err)
 	}
 
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("Error decoding response: %v", err)
+		return types.ResponseBody{}, fmt.Errorf("Error decoding response: %v", err)
 	}
 
-	if resp["hits"].(map[string]interface{})["hits"] == "" {
-		return nil, nil
+	if resp.Hits.Hits == nil {
+		return types.ResponseBody{}, nil
 	} else {
-		for _, hit := range resp["hits"].(map[string]interface{})["hits"].([]interface{}) {
-			doc := hit.(map[string]interface{})
-			source := doc["_source"]
-			return source, nil
-		}
+		return resp, nil
 	}
-
-	return nil, nil
-
 }
 
-func (r *repo) Search(db *gorm.DB, data string) ([]map[string]interface{}, error) {
-	var resp map[string]interface{}
+func (r *repo) Search(db *gorm.DB, data string) (types.ResponseBody, error) {
+	var resp types.ResponseBody
 	var ctx context.Context
 
 	// Context with timeout
@@ -193,32 +167,20 @@ func (r *repo) Search(db *gorm.DB, data string) ([]map[string]interface{}, error
 	// Execute the search request
 	response, err := search.Do(ctx, config.EsClient)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting response: %v", err)
+		return types.ResponseBody{}, fmt.Errorf("Error getting response: %v", err)
 	}
 	defer response.Body.Close()
 
-	if response.IsError() || response.StatusCode > 299 {
-		return nil, fmt.Errorf("Elasticsearch error: %v", response.String())
-	}
-
 	// Decode the response
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("Error decoding response: %v", err)
+		return types.ResponseBody{}, fmt.Errorf("Error decoding response: %v", err)
 	}
 
-	hits := resp["hits"].(map[string]interface{})["hits"].([]interface{})
+	hits := resp.Hits.Hits
 	if len(hits) == 0 {
-		return nil, nil
+		return types.ResponseBody{}, nil
 	}
-
-	var results []map[string]interface{}
-	for _, hit := range hits {
-		doc := hit.(map[string]interface{})
-		source := doc["_source"].(map[string]interface{})
-		results = append(results, source)
-	}
-
-	return results, nil
+	return resp, nil
 }
 
 func (r *repo) UpdateTrademarkVisibility(db *gorm.DB, caseFile *model.CaseFile) error {
@@ -243,10 +205,6 @@ func (r *repo) UpdateTrademarkVisibility(db *gorm.DB, caseFile *model.CaseFile) 
 		return fmt.Errorf("error getting response: %v", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.IsError() || resp.StatusCode > 299 {
-		return fmt.Errorf("elasticsearch error: %v", resp.String())
-	}
 
 	return nil
 }

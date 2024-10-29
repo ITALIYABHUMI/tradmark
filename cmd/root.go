@@ -8,15 +8,15 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "zero",
-	Short: "zero is a cli tool for performing basic mathematical operations",
-	Long:  "zero is a cli tool for performing basic mathematical operations - addition, multiplication, division and subtraction.",
+	Use:   "UnzipAndStoreData",
+	Short: "UnzipAndStoreData is a cli tool for performing file system operations",
+	Long:  "UnzipAndStoreData is a cli tool for performing basic file system operations",
 	Run:   func(cmd *cobra.Command, args []string) {},
 }
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Oops. An error while executing Zero '%s'\n", err)
+		fmt.Fprintf(os.Stderr, "Oops. An error while executing UnzipAndStoreData '%s'\n", err)
 		os.Exit(1)
 	}
 }

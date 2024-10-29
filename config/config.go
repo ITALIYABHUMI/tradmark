@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/tradmark/public/model"
+	"github.com/tradmark/api/model"
 )
 
 var settings model.Settings

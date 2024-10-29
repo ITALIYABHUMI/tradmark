@@ -1,20 +1,11 @@
 package tradmark
 
 import (
-	"github.com/tradmark/public/model"
+	"github.com/tradmark/api/model"
 	"gorm.io/gorm"
 )
 
-type Repository interface {
-	CreateCaseFiles(db *gorm.DB, caseFile *model.CaseFile) error
-	UpdateTrademarkVisibility(db *gorm.DB, serialNumber string, visible string) (*model.CaseFile, error)
-}
-
-type repo struct{}
-
-func PostgresRepo() Repository {
-	return &repo{}
-}
+type repo struct {}
 
 func (r *repo) CreateCaseFiles(db *gorm.DB, caseFile *model.CaseFile) error {
 	return db.Create(caseFile).Error
